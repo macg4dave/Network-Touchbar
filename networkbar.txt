@@ -1,0 +1,171 @@
+property tx_num : ""
+property tx_rate : ""
+property rx_num : ""
+property rx_rate : ""
+property mon_rate : ""
+property mon_size : ""
+property vnstat_cmd : ""
+property live_vnstat_txt : ""
+property mon_vnstat_txt : ""
+property bar_uuid : "61290620-B547-432E-BEC3-3F704D1B4AA4"
+property bar_colour : "0,182,0,255"
+property which_output : ""
+
+--set var
+set vnstat_cmd to "/usr/local/bin/vnstat"
+set live_vnstat_txt to do shell script vnstat_cmd & " -tr 2" as string
+set mon_vnstat_txt to do shell script vnstat_cmd & " -m" as string
+
+-- sets the output from kbit to kb,  Flags are kb or kbit
+set which_output to "kb"
+
+--end var
+
+-- prog load
+make_rate()
+make_mon()
+
+if which_output is "kb" then
+	kib_covrt()
+end if
+
+make_num_width()
+update_bar()
+-- prog end
+
+on make_rate()
+	set line_vnstat_count to count of every paragraph of live_vnstat_txt
+	
+	repeat while line_vnstat_count is greater than "0"
+		
+		set live_rx_txt to paragraph line_vnstat_count of live_vnstat_txt
+		
+		try
+			set is_tx_test to do shell script "echo " & quoted form of live_rx_txt & " | grep 'tx' | awk '{print $2}'"
+			set is_tx_num to count of every word of is_tx_test
+		end try
+		
+		try
+			set is_rx_test to do shell script "echo " & quoted form of live_rx_txt & " | grep 'rx' | awk '{print $2}'"
+			set is_rx_num to count of every word of is_rx_test
+		end try
+		
+		if is_tx_num is greater than "0" then
+			set tx_num to do shell script "echo " & quoted form of live_rx_txt & " | grep 'tx' | awk '{print $2}'"
+			set tx_rate to do shell script "echo " & quoted form of live_rx_txt & " | grep 'tx' | awk '{print $3}'"
+			
+		end if
+		
+		if is_rx_num is greater than "0" then
+			set rx_num to do shell script "echo " & quoted form of live_rx_txt & " | grep 'rx' | awk '{print $2}'"
+			set rx_rate to do shell script "echo " & quoted form of live_rx_txt & " | grep 'rx' | awk '{print $3}'"
+		end if
+		
+		
+		set line_vnstat_count to line_vnstat_count - 1
+	end repeat
+	
+end make_rate
+
+
+
+on make_mon()
+	
+	set mon_vnstat_count to count of every paragraph of mon_vnstat_txt
+	
+	repeat while mon_vnstat_count is greater than "0"
+		
+		set mon_txt to paragraph mon_vnstat_count of mon_vnstat_txt
+		
+		try
+			set is_mon_test to do shell script "echo " & quoted form of mon_txt & " | grep 'estimated' | awk '{print $2}'"
+			set is_mon_num to count of every word of is_mon_test
+		end try
+		
+		if is_mon_num is greater than "0" then
+			set mon_rate to do shell script "echo " & quoted form of mon_txt & " | grep 'estimated' | awk '{print $2}'"
+			set mon_size to do shell script "echo " & quoted form of mon_txt & " | grep 'estimated' | awk '{print $3}'"
+		end if
+		
+		
+		set mon_vnstat_count to mon_vnstat_count - 1
+	end repeat
+	
+	
+end make_mon
+
+-- coverts kbit to KB
+on kib_covrt()
+	set tx_num_fixer to make_kb(tx_num)
+	set tx_num to tx_num_fixer
+	set rx_num_fixer to make_kb(rx_num)
+	set rx_num to rx_num_fixer
+	
+	if rx_rate is equal to "kbit/s" then
+		set rx_rate to "KB"
+	end if
+	if tx_rate is equal to "kbit/s" then
+		set tx_rate to "KB"
+	end if
+	
+	if rx_rate is equal to "Mbit/s" then
+		set rx_rate to "MB"
+	end if
+	if tx_rate is equal to "Mbit/s" then
+		set tx_rate to "MB"
+	end if
+end kib_covrt
+
+on make_num_width()
+	
+	set tx_num_fixer to fix_width(tx_num)
+	set tx_num to tx_num_fixer
+	
+	set rx_num_fixer to fix_width(rx_num)
+	set rx_num to rx_num_fixer
+	
+end make_num_width
+
+--Makes output 3 chars long
+on fix_width(string_in)
+	
+	set whole_num to make_whole_num(string_in)
+	set output_string to do shell script "printf '%3d' '" & whole_num & "'"
+	
+	return output_string
+end fix_width
+
+--makes a decimal number whole
+on make_whole_num(flot_number)
+	
+	set working_num to do shell script "printf '%.0f' '" & flot_number & "'"
+	
+	return working_num
+	
+end make_whole_num
+
+--- kbit to KB
+on make_kb(kbit_in)
+	
+	set start_kb to kbit_in / 8
+	set whole_kb_num to make_whole_num(start_kb)
+	return whole_kb_num
+	
+end make_kb
+
+
+on update_bar()
+	
+	set make_bar_info to tx_num & "*&*" & tx_rate & "*&*" & rx_num & "*&*" & rx_rate
+	
+	
+	tell application "BetterTouchTool"
+		set full_bar_info to do shell script "echo " & quoted form of make_bar_info & " | column -s '*&*' -t"
+		update_touch_bar_widget bar_uuid text full_bar_info background_color bar_colour
+	end tell
+	
+end update_bar
+
+log tx_num
+log rx_num
+
